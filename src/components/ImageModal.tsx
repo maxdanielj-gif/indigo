@@ -11,49 +11,7 @@ interface ImageModalProps {
   onCopyPrompt?: (prompt: string) => void;
 }
 
-const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, mediaType: initialMediaType, prompt, onCopyPrompt }) => {
-  const [videoUrl, setVideoUrl] = React.useState<string | null>(null);
-  const [isConverting, setIsConverting] = React.useState(false);
-
-  const mediaType = initialMediaType || (
-    (imageUrl.startsWith('data:video/') || imageUrl.includes('.mp4') || imageUrl.includes('.webm') || imageUrl.includes('blob:')) 
-    ? 'video' 
-    : 'image'
-  );
-
-  React.useEffect(() => {
-    let currentUrl: string | null = null;
-
-    const convertToBlob = async () => {
-      if (!isOpen) return;
-
-      if (mediaType === 'video' && imageUrl.startsWith('data:')) {
-        setIsConverting(true);
-        try {
-          const response = await fetch(imageUrl);
-          const blob = await response.blob();
-          currentUrl = URL.createObjectURL(blob);
-          setVideoUrl(currentUrl);
-        } catch (err) {
-          console.error("Failed to convert data URL to blob URL", err);
-          setVideoUrl(imageUrl);
-        } finally {
-          setIsConverting(false);
-        }
-      } else {
-        setVideoUrl(imageUrl);
-      }
-    };
-
-    convertToBlob();
-
-    return () => {
-      if (currentUrl && currentUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(currentUrl);
-      }
-    };
-  }, [imageUrl, mediaType, isOpen]);
-  
+const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, prompt, onCopyPrompt }) => {
   if (!isOpen) return null;
 
   return (
@@ -62,7 +20,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, medi
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 md:p-8"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
@@ -73,69 +31,55 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, medi
           className="relative max-w-5xl w-full max-h-full flex flex-col items-center"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={onClose}
-            className="absolute -top-12 right-0 md:-top-4 md:-right-12 p-2 text-white hover:text-gray-300 transition-colors bg-white/10 rounded-full backdrop-blur-md"
-          >
-            <X className="w-8 h-8" />
-          </button>
+          {/* Image with close button overlaid */}
+          <div className="relative w-full flex flex-col items-center">
+            <img
+              src={imageUrl}
+              alt="Full view"
+              className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+            />
+            {/* Close button — overlaid on top-right corner of the image */}
+            <button
+              onClick={onClose}
+              className="absolute top-2 right-2 w-9 h-9 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
           
-          <div className="relative group w-full flex flex-col items-center">
-            {isConverting ? (
-              <div className="w-full aspect-video flex flex-col items-center justify-center bg-indigo-100 dark:bg-indigo-900 rounded-lg">
-                <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-indigo-900 dark:text-indigo-100 font-medium">Preparing video...</p>
-              </div>
-            ) : mediaType === 'video' ? (
-              <video
-                src={videoUrl || imageUrl}
-                controls
-                autoPlay
-                playsInline
-                className="max-w-full max-h-[80vh] rounded-lg shadow-2xl"
-              />
-            ) : (
-              <img
-                src={imageUrl}
-                alt="Full view"
-                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
-              />
-            )}
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <a
+              href={imageUrl}
+              download="image.png"
+              className="flex items-center px-5 py-2.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 rounded-full font-bold hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-all shadow-lg text-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </a>
             
-            <div className="mt-4 flex flex-wrap justify-center gap-4">
-              <a
-                href={videoUrl || imageUrl}
-                download={mediaType === 'video' ? "video.mp4" : "image.png"}
-                className={`flex items-center px-6 py-3 bg-indigo-100 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 rounded-full font-bold hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-all shadow-lg ${isConverting ? 'opacity-50 pointer-events-none' : ''}`}
-                onClick={(e) => e.stopPropagation()}
+            {prompt && onCopyPrompt && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopyPrompt(prompt);
+                }}
+                className="flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 transition-all shadow-lg text-sm"
               >
-                <Download className="w-5 h-5 mr-2" />
-                Download
-              </a>
-              
-              {prompt && onCopyPrompt && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCopyPrompt(prompt);
-                  }}
-                  className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 transition-all shadow-lg"
-                >
-                  <Copy className="w-5 h-5 mr-2" />
-                  Copy Prompt
-                </button>
-              )}
-            </div>
-
-            {prompt && (
-              <div className="mt-6 p-4 bg-indigo-100/50 dark:bg-indigo-900/50 backdrop-blur-md rounded-xl border border-indigo-200 dark:border-indigo-800 max-w-2xl w-full">
-                <h4 className="text-xs font-bold text-indigo-900/60 dark:text-indigo-100/60 uppercase tracking-wider mb-2">Prompt</h4>
-                <p className="text-sm text-indigo-900 dark:text-indigo-100 leading-relaxed italic">
-                  "{prompt}"
-                </p>
-              </div>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Prompt
+              </button>
             )}
           </div>
+
+          {prompt && (
+            <div className="mt-4 p-3 bg-indigo-100/50 dark:bg-indigo-900/50 backdrop-blur-md rounded-xl border border-indigo-200 dark:border-indigo-800 max-w-2xl w-full">
+              <h4 className="text-xs font-bold text-indigo-900/60 dark:text-indigo-100/60 uppercase tracking-wider mb-1">Prompt</h4>
+              <p className="text-sm text-indigo-900 dark:text-indigo-100 leading-relaxed italic">
+                "{prompt}"
+              </p>
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
