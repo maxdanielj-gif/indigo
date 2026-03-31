@@ -17,6 +17,9 @@ const ChatManager: React.FC = () => {
     autoJsonBackupInterval,
     exportData,
     fetchWithRetry,
+    isSyncEnabled,
+    syncFrequency,
+    addToast,
   } = useApp();
 
   const { addChatMessage, chatHistory, sessions, activeSessionId } = useChat();
@@ -233,6 +236,44 @@ const ChatManager: React.FC = () => {
     const id = setInterval(check, 30000);
     return () => clearInterval(id);
   }, [isLoaded, aiProfile.ambientMode, aiProfile.ambientFrequency]);
+
+  // ── Auto cloud sync ────────────────────────────────────────────────
+  const syncInProgressRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!isLoaded || !isSyncEnabled || !userId || syncFrequency <= 0) return;
+
+    const intervalMs = syncFrequency * 60 * 1000;
+
+    const doSync = async () => {
+      if (syncInProgressRef.current) return;
+      syncInProgressRef.current = true;
+      try {
+        const data = await exportData(chatHistory, sessions, activeSessionId);
+        const { gzipSync, strToU8 } = await import('fflate');
+        const compressed = gzipSync(strToU8(JSON.stringify({ userId, data })));
+        const res = await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: compressed,
+        });
+        if (res.ok) {
+          console.log(`[AutoSync] Synced to cloud (${Math.round(compressed.length / 1024)}KB)`);
+        } else {
+          console.warn(`[AutoSync] Failed: HTTP ${res.status}`);
+        }
+      } catch (e) {
+        console.error('[AutoSync] Error:', e);
+      } finally {
+        syncInProgressRef.current = false;
+      }
+    };
+
+    // Run immediately on first enable, then on interval
+    const timeout = setTimeout(doSync, 5000); // 5s after enable
+    const id = setInterval(doSync, intervalMs);
+    return () => { clearTimeout(timeout); clearInterval(id); };
+  }, [isLoaded, isSyncEnabled, syncFrequency, userId]);
 
   return null;
 };
