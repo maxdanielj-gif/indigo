@@ -1000,17 +1000,19 @@ app.post("/api/wavespeed/generate", express.json({ limit: "20mb" }), async (req,
     // Size (width x height) — optional, defaults to input image size
     if (size) body.size = size;
 
-    // Images — model-specific field names:
-    // Qwen models use "image" (singular string, first image only)
-    // Flux/other models use "images" (array, max 3)
+    // Images — field naming depends on model type:
+    // Image editing models (Qwen, Flux edit, etc.) use "image" (singular string, first image only)
+    // Text-to-image models use "images" (array, max 3)
     if (Array.isArray(images) && images.length > 0) {
       const cleanImages = images.filter(Boolean);
+      // Most models that accept images are image-editing models — they use singular "image"
       const isQwen = model.includes('qwen-image');
-      if (isQwen) {
-        // Qwen edit models want "image" as a single string
+      const isFluxEdit = model.includes('flux') && model.includes('edit');
+      if (isQwen || isFluxEdit) {
+        // Image editing models want "image" as a single string
         body.image = cleanImages[0];
       } else {
-        // Flux Klein, Turbo, etc. want "images" array, max 3
+        // Text-to-image models want "images" array, max 3
         body.images = cleanImages.slice(0, 3);
       }
     }
